@@ -3,7 +3,7 @@
 	url = git://github.com/windsorschmidt/disable-workspace-switcher-popup
 [submodule "steal-my-focus"]
 	path = steal-my-focus
-	url = git://github.com/kagesenshi/gnome-shell-extension-stealmyfocus
+	url = git://github.com/neitsab/gnome-shell-extension-stealmyfocus
 [submodule "system-monitor"]
 	path = system-monitor
 	url = git://github.com/paradoxxxzero/gnome-shell-system-monitor-applet
