@@ -1,3 +1,6 @@
 [submodule "disable-workspace-switcher-popup"]
 	path = disable-workspace-switcher-popup
 	url = git://github.com/windsorschmidt/disable-workspace-switcher-popup
+[submodule "steal-my-focus"]
+	path = steal-my-focus
+	url = git://github.com/kagesenshi/gnome-shell-extension-stealmyfocus
