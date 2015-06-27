@@ -1,0 +1,3 @@
+[submodule "disable-workspace-switcher-popup"]
+	path = disable-workspace-switcher-popup
+	url = git://github.com/windsorschmidt/disable-workspace-switcher-popup
