@@ -7,3 +7,6 @@
 [submodule "system-monitor"]
 	path = system-monitor
 	url = git://github.com/paradoxxxzero/gnome-shell-system-monitor-applet
+[submodule "impatience"]
+	path = impatience
+	url = git://github.com/gfxmonk/gnome-shell-impatience
