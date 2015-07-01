@@ -66,7 +66,7 @@
       <description>Choose whether to display wind direction through arrows or letters.</description>
     </key>
     <key type="s" name="city">
-      <default>'2516479>Eivissa (CA)'</default>
+      <default>'-8.5211767,179.1976747>Vaiaku, Tuvalu>-1'</default>
       <summary>City to be displayed</summary>
     </key>
     <key type="i" name="actual-city">
