@@ -6,9 +6,10 @@
   "shell-version": [
     "3.12", 
     "3.14", 
-    "3.16"
+    "3.16", 
+    "3.17.3"
   ], 
   "url": "https://github.com/jenslody/gnome-shell-extension-openweather", 
   "uuid": "openweather-extension@jenslody.de", 
-  "version": 38
+  "version": 39
 }
