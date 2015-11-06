@@ -1,3 +1,46 @@
+3.18.0
+======
+* Bump version
+
+3.17.92
+=======
+* places: Include DESKTOP when desktop icons are enabled
+* updated translations (fa)
+
+3.17.91
+=======
+* updated translations (nl, pl, zh_TW)
+
+3.17.90
+=======
+* window-list: Improve application ordering
+* workspace-indicator: Use consistent workspace numbering
+
+3.17.4
+======
+* updated translations (fur)
+
+3.17.3
+======
+* window-list: Adjust with text-scaling-factor
+* classic style updates
+* updated translations (pt, ro)
+
+3.17.2
+======
+* updated translations (oc, pt, zh_CN)
+
+3.17.1
+======
+* style updates
+* updated translations (oc)
+
+3.16.1
+======
+* window-list: Fix workspace indicators popup menu position
+* apps-menu: Fix taking over panel-main-menu shortcut
+* updated translations (et, ja, lv)
+
 3.16.0
 ======
 * updated translations (ca)
