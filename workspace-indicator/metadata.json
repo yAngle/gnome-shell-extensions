@@ -9,9 +9,9 @@
   ], 
   "settings-schema": "org.gnome.shell.extensions.workspace-indicator", 
   "shell-version": [
-    "3.16"
+    "3.18"
   ], 
   "url": "http://git.gnome.org/gnome-shell-extensions", 
   "uuid": "workspace-indicator@gnome-shell-extensions.gcampax.github.com", 
-  "version": 27
+  "version": 28
 }
