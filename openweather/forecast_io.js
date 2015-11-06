@@ -5,7 +5,7 @@
  *  - Displays a small weather information on the top panel.
  *  - On click, gives a popup with details about the weather.
  *
- * Copyright (C) 2011 - 2015
+ * Copyright (C) 2011 - 2013
  *     ecyrbe <ecyrbe+spam@gmail.com>,
  *     Timur Kristof <venemo@msn.com>,
  *     Elad Alfassa <elad@fedoraproject.org>,
@@ -15,6 +15,8 @@
  *     Mattia Meneguzzo odysseus@fedoraproject.org,
  *     Meng Zhuo <mengzhuo1203+spam@gmail.com>,
  *     Jens Lody <jens@jenslody.de>
+ * Copyright (C) 2014 -2015
+ *     Jens Lody <jens@jenslody.de>,
  *
  *
  * This file is part of gnome-shell-extension-openweather.
@@ -40,7 +42,7 @@ const ngettext = Gettext.ngettext;
 
 
 const OPENWEATHER_URL_HOST = 'api.forecast.io';
-const OPENWEATHER_URL_BASE = 'http://' + OPENWEATHER_URL_HOST + '/forecast/';
+const OPENWEATHER_URL_BASE = 'https://' + OPENWEATHER_URL_HOST + '/forecast/';
 
 function getWeatherIcon(icon) {
     //    clear-day             weather-clear-day
@@ -93,9 +95,21 @@ function getWeatherIcon(icon) {
 
 function parseWeatherCurrent() {
     if (this.currentWeatherCache === undefined) {
+        // this is a reentrency guard, in this times set for both caches,
+        // because they get updated with one call to forecast.io
+        this.currentWeatherCache = "in refresh";
+        // but do it only if the cache has been cleared, otherwise we would
+        // overwrite possibly valid data, that can be kept if the update fails
+        // for some reason
+        if (this.forecastWeatherCache === undefined)
+            this.forecastWeatherCache = "in refresh";
         this.refreshWeatherCurrent();
         return;
     }
+
+    if ((this.forecastWeatherCache == "in refresh") ||
+        (this.currentWeatherCache == "in refresh"))
+        return;
 
     this.checkPositionInPanel();
 
@@ -198,7 +212,19 @@ function refreshWeatherCurrent() {
 }
 
 function parseWeatherForecast() {
+    if ((this.forecastWeatherCache == "in refresh") ||
+        (this.currentWeatherCache == "in refresh"))
+        return;
+
     if (this.forecastWeatherCache === undefined) {
+        // this is a reentrency guard, in this times set for both caches,
+        // because they get updated with one call to forecast.io
+        this.forecastWeatherCache = "in refresh";
+        // but do it only if the cache has been cleared, otherwise we would
+        // overwrite possibly valid data, that can be kept if the update fails
+        // for some reason
+        if (this.currentWeatherCache === undefined)
+            this.currentWeatherCache = "in refresh";
         this.refreshWeatherCurrent();
         return;
     }

@@ -5,7 +5,7 @@
  *  - Displays a small weather information on the top panel.
  *  - On click, gives a popup with details about the weather.
  *
- * Copyright (C) 2011 - 2015
+ * Copyright (C) 2011 - 2013
  *     ecyrbe <ecyrbe+spam@gmail.com>,
  *     Timur Kristof <venemo@msn.com>,
  *     Elad Alfassa <elad@fedoraproject.org>,
@@ -15,6 +15,8 @@
  *     Mattia Meneguzzo odysseus@fedoraproject.org,
  *     Meng Zhuo <mengzhuo1203+spam@gmail.com>,
  *     Jens Lody <jens@jenslody.de>
+ * Copyright (C) 2014 -2015
+ *     Jens Lody <jens@jenslody.de>,
  *
  *
  * This file is part of gnome-shell-extension-openweather.
@@ -49,6 +51,7 @@ const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const Soup = imports.gi.Soup;
 const St = imports.gi.St;
+const GnomeSession = imports.misc.gnomeSession;
 const Util = imports.misc.util;
 const _ = Gettext.gettext;
 
@@ -109,15 +112,16 @@ const WeatherWindSpeedUnits = {
 };
 
 const WeatherPressureUnits = {
-    hPa: 0,
-    inHg: 1,
-    bar: 2,
-    Pa: 3,
-    kPa: 4,
-    atm: 5,
-    at: 6,
-    Torr: 7,
-    psi: 8
+    HPA: 0,
+    INHG: 1,
+    BAR: 2,
+    PA: 3,
+    KPA: 4,
+    ATM: 5,
+    AT: 6,
+    TORR: 7,
+    PSI: 8,
+    MMHG: 9
 };
 
 const WeatherPosition = {
@@ -132,6 +136,8 @@ const OPENWEATHER_CONV_MPS_IN_KNOTS = 1.94384449;
 const OPENWEATHER_CONV_MPS_IN_FPS = 3.2808399;
 
 let _httpSession;
+let _currentWeatherCache, _forecastWeatherCache;
+let _timeCacheCurrentWeather, _timeCacheForecastWeather;
 
 const OpenweatherMenuButton = new Lang.Class({
     Name: 'OpenweatherMenuButton',
@@ -141,12 +147,19 @@ const OpenweatherMenuButton = new Lang.Class({
     _init: function() {
         this.owmCityId = 0;
 
+        // Create user-agent string from uuid and (if present) the version
+        this.user_agent = Me.metadata.uuid;
+        if (Me.metadata.version !== undefined && Me.metadata.version.toString().trim() !== '') {
+            this.user_agent += '/';
+            this.user_agent += Me.metadata.version.toString();
+        }
+        // add trailing space, so libsoup adds its own user-agent
+        this.user_agent += ' ';
+
         this.oldProvider = this._weather_provider;
         this.oldTranslateCondition = this._translate_condition;
         this.switchProvider();
 
-        this.currentWeatherCache = undefined;
-        this.forecastWeatherCache = undefined;
         // Load settings
         this.loadConfig();
 
@@ -198,6 +211,8 @@ const OpenweatherMenuButton = new Lang.Class({
         else
             Main.panel._menus.addMenu(this.menu);
 
+        this._session = new GnomeSession.SessionManager();
+
         this._old_position_in_panel = this._position_in_panel;
 
         // Current weather
@@ -247,16 +262,49 @@ const OpenweatherMenuButton = new Lang.Class({
         this.rebuildCurrentWeatherUi();
         this.rebuildFutureWeatherUi();
 
+        this._idle = false;
+        this._connected = false;
+
         this._network_monitor = Gio.network_monitor_get_default();
 
-        this._connected = false;
+        this._presence = new GnomeSession.Presence(Lang.bind(this, function(proxy, error) {
+            this._onStatusChanged(proxy.status);
+        }));
+        this._presence_connection = this._presence.connectSignal('StatusChanged', Lang.bind(this, function(proxy, senderName, [status]) {
+            this._onStatusChanged(status);
+        }));
+
+        this.currentWeatherCache = _currentWeatherCache;
+        this.forecastWeatherCache = _forecastWeatherCache;
+        if (_timeCacheForecastWeather !== undefined) {
+            let diff = Math.floor(new Date(new Date() - _timeCacheForecastWeather).getTime() / 1000);
+            if (diff < this._refresh_interval_forecast)
+                this.reloadWeatherForecast(this._refresh_interval_forecast - diff);
+        }
+        if (_timeCacheCurrentWeather !== undefined) {
+            let diff = Math.floor(new Date(new Date() - _timeCacheCurrentWeather).getTime() / 1000);
+            if (diff < this._refresh_interval_current)
+                this.reloadWeatherCurrent(this._refresh_interval_current - diff);
+        }
         this._network_monitor_connection = this._network_monitor.connect('network-changed', Lang.bind(this, this._onNetworkStateChanged));
+
         this._checkConnectionState();
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.recalcLayout));
     },
 
+    _onStatusChanged: function(status) {
+        this._idle = false;
+
+        if (status == GnomeSession.PresenceStatus.IDLE) {
+            this._idle = true;
+        }
+    },
+
     stop: function() {
+        _forecastWeatherCache = this.forecastWeatherCache;
+        _currentWeatherCache = this.currentWeatherCache;
+
         if (_httpSession !== undefined)
             _httpSession.abort();
 
@@ -271,6 +319,11 @@ const OpenweatherMenuButton = new Lang.Class({
             Mainloop.source_remove(this._timeoutForecast);
 
         this._timeoutForecast = undefined;
+
+        if (this._presence_connection) {
+            this._presence.disconnect(this._presence_connection);
+            this._presence_connection = undefined;
+        }
 
         if (this._network_monitor_connection) {
             this._network_monitor.disconnect(this._network_monitor_connection);
@@ -309,6 +362,10 @@ const OpenweatherMenuButton = new Lang.Class({
         this.refreshWeatherForecast = OpenweathermapOrg.refreshWeatherForecast;
 
         this.weatherProvider = "https://openweathermap.org/";
+
+        if (this._appid.toString().trim() === '')
+            Main.notify("Openweather", _("Openweathermap.org does not work without an api-key.\nPlease register at http://openweathermap.org/appid and paste your personal key into the preferences dialog."));
+
     },
 
     useForecastIo: function() {
@@ -323,7 +380,29 @@ const OpenweatherMenuButton = new Lang.Class({
         this.fc_locale = 'en';
 
         if (this._translate_condition) {
-            let fc_locales = ['bs', 'de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt', 'ru', 'tet', 'x-pig-latin'];
+            let fc_locales = [
+                'ar',
+                'bs',
+                'de',
+                'el',
+                'en',
+                'es',
+                'fr',
+                'hr',
+                'it',
+                'nl',
+                'pl',
+                'pt',
+                'ru',
+                'sk',
+                'sv',
+                'tet',
+                'tr',
+                'uk',
+                'x-pig-latin',
+                'zh',
+                'zh-tw'
+            ];
             let locale = GLib.get_language_names()[0];
 
             if (locale.indexOf('_') != -1)
@@ -332,6 +411,9 @@ const OpenweatherMenuButton = new Lang.Class({
             if (fc_locales.indexOf(locale) != -1)
                 this.fc_locale = locale;
         }
+
+        if (this._appid_fc.toString().trim() === '')
+            Main.notify("Openweather", _("Forecast.io does not work without an api-key.\nPlease register at https://developer.forecast.io/register and paste your personal key into the preferences dialog."));
     },
 
     getWeatherProviderURL: function() {
@@ -396,9 +478,31 @@ const OpenweatherMenuButton = new Lang.Class({
     },
 
     _checkConnectionState: function() {
-        this._connected = this._network_monitor.network_available;
-        if (this._connected)
+        let url = this.getWeatherProviderURL();
+        let address = Gio.NetworkAddress.parse_uri(url, 80);
+        let cancellable = Gio.Cancellable.new();
+        this._oldConnected = this._connected;
+        this._connected = false;
+        try {
+            this._network_monitor.can_reach_async(address, cancellable, Lang.bind(this, this._asyncReadyCallback));
+        } catch (err) {
+            let title = _("Can not connect to %s").format(url);
+            log(title + '\n' + err.message);
+        }
+    },
+
+    _asyncReadyCallback: function(nm, res) {
+        this._connected = this._network_monitor.can_reach_finish(res);
+        if (!this._oldConnected && this._connected) {
+            let now = new Date();
+            if (_timeCacheCurrentWeather &&
+                (Math.floor(new Date(now - _timeCacheCurrentWeather).getTime() / 1000) > this._refresh_interval_current))
+                this.currentWeatherCache = undefined;
+            if (_timeCacheForecastWeather &&
+                (Math.floor(new Date(now - _timeCacheForecastWeather).getTime() / 1000) > this._refresh_interval_forecast))
+                this.forecastWeatherCache = undefined;
             this.parseWeatherCurrent();
+        }
     },
 
     locationChanged: function() {
@@ -471,6 +575,12 @@ const OpenweatherMenuButton = new Lang.Class({
         if (!this._settings)
             this.loadConfig();
         return this._settings.get_string(OPENWEATHER_CITY_KEY);
+    },
+
+    set _cities(v) {
+        if (!this._settings)
+            this.loadConfig();
+        return this._settings.set_string(OPENWEATHER_CITY_KEY, v);
     },
 
     get _actual_city() {
@@ -750,7 +860,7 @@ const OpenweatherMenuButton = new Lang.Class({
             coords = arguments[0].split(">")[0];
 
         if ((coords.search(",") == -1) || isNaN(coords.split(",")[0]) || isNaN(coords.split(",")[1])) {
-            Main.notify("Openweathermap", _("Invalid location! Please try to recreate it."));
+            Main.notify("Openweather", _("Invalid location! Please try to recreate it."));
             return 0;
         }
 
@@ -922,12 +1032,15 @@ const OpenweatherMenuButton = new Lang.Class({
     load_json_async: function(url, params, fun) {
         if (_httpSession === undefined) {
             _httpSession = new Soup.Session();
+            _httpSession.user_agent = this.user_agent;
+        } else {
+            // abort previous requests.
+            _httpSession.abort();
         }
 
         let message = Soup.form_request_new_from_hash('GET', url, params);
 
         _httpSession.queue_message(message, Lang.bind(this, function(_httpSession, message) {
-
             try {
                 if (!message.response_body.data) {
                     fun.call(this, 0);
@@ -980,49 +1093,54 @@ const OpenweatherMenuButton = new Lang.Class({
     formatPressure: function(pressure) {
         let pressure_unit = 'hPa';
         switch (this._pressure_units) {
-            case WeatherPressureUnits.inHg:
+            case WeatherPressureUnits.INHG:
                 pressure = this.toInHg(pressure);
                 pressure_unit = "inHg";
                 break;
 
-            case WeatherPressureUnits.hPa:
+            case WeatherPressureUnits.HPA:
                 pressure = pressure.toFixed(this._decimal_places);
                 pressure_unit = "hPa";
                 break;
 
-            case WeatherPressureUnits.bar:
+            case WeatherPressureUnits.BAR:
                 pressure = (pressure / 1000).toFixed(this._decimal_places);
                 pressure_unit = "bar";
                 break;
 
-            case WeatherPressureUnits.Pa:
+            case WeatherPressureUnits.PA:
                 pressure = (pressure * 100).toFixed(this._decimal_places);
                 pressure_unit = "Pa";
                 break;
 
-            case WeatherPressureUnits.kPa:
+            case WeatherPressureUnits.KPA:
                 pressure = (pressure / 10).toFixed(this._decimal_places);
                 pressure_unit = "kPa";
                 break;
 
-            case WeatherPressureUnits.atm:
+            case WeatherPressureUnits.ATM:
                 pressure = (pressure * 0.000986923267).toFixed(this._decimal_places);
                 pressure_unit = "atm";
                 break;
 
-            case WeatherPressureUnits.at:
+            case WeatherPressureUnits.AT:
                 pressure = (pressure * 0.00101971621298).toFixed(this._decimal_places);
                 pressure_unit = "at";
                 break;
 
-            case WeatherPressureUnits.Torr:
+            case WeatherPressureUnits.TORR:
                 pressure = (pressure * 0.750061683).toFixed(this._decimal_places);
                 pressure_unit = "Torr";
                 break;
 
-            case WeatherPressureUnits.psi:
+            case WeatherPressureUnits.PSI:
                 pressure = (pressure * 0.0145037738).toFixed(this._decimal_places);
                 pressure_unit = "psi";
+                break;
+
+            case WeatherPressureUnits.MMHG:
+                pressure = (pressure * 0.750061683).toFixed(this._decimal_places);
+                pressure_unit = "mmHg";
                 break;
         }
         return parseFloat(pressure).toLocaleString() + ' ' + pressure_unit;
@@ -1110,13 +1228,14 @@ const OpenweatherMenuButton = new Lang.Class({
     reloadWeatherCurrent: function(interval) {
         if (this._timeoutCurrent) {
             Mainloop.source_remove(this._timeoutCurrent);
+            this._timeoutCurrent = undefined;
         }
+        _timeCacheCurrentWeather = new Date();
         this._timeoutCurrent = Mainloop.timeout_add_seconds(interval, Lang.bind(this, function() {
-            this.currentWeatherCache = undefined;
-            if (this._connected)
-                this.parseWeatherCurrent();
-            else
-                this.rebuildCurrentWeatherUi();
+            // only invalidate cached data, if we can connect the weather-providers server
+            if (this._connected && !this._idle)
+                this.currentWeatherCache = undefined;
+            this.parseWeatherCurrent();
             return true;
         }));
     },
@@ -1124,13 +1243,14 @@ const OpenweatherMenuButton = new Lang.Class({
     reloadWeatherForecast: function(interval) {
         if (this._timeoutForecast) {
             Mainloop.source_remove(this._timeoutForecast);
+            this._timeoutForecast = undefined;
         }
+        _timeCacheForecastWeather = new Date();
         this._timeoutForecast = Mainloop.timeout_add_seconds(interval, Lang.bind(this, function() {
-            this.forecastWeatherCache = undefined;
-            if (this._connected)
-                this.parseWeatherForecast();
-            else
-                this.rebuildFutureWeatherUi();
+            // only invalidate cached data, if we can connect the weather-providers server
+            if (this._connected && !this._idle)
+                this.forecastWeatherCache = undefined;
+            this.parseWeatherForecast();
             return true;
         }));
     },
@@ -1146,7 +1266,7 @@ const OpenweatherMenuButton = new Lang.Class({
     },
 
     rebuildCurrentWeatherUi: function() {
-        this._weatherInfo.text = _('Loading current weather ...');
+        this._weatherInfo.text = (' ');
         this._weatherIcon.icon_name = 'view-refresh' + this.getIconType();
 
         this.destroyCurrentWeather();

@@ -4,9 +4,11 @@
  *  Weather extension for GNOME Shell preferences
  *  - Creates a widget to set the preferences of the weather extension
  *
- * Copyright (C) 2012 - 2015
+ * Copyright (C) 2012 - 2013
  *     Canek Peláez <canek@ciencias.unam.mx>,
  *     Christian METZLER <neroth@xeked.com>,
+ *     Jens Lody <jens@jenslody.de>,
+ * Copyright (C) 2014 -2015
  *     Jens Lody <jens@jenslody.de>,
  *
  * This file is part of gnome-shell-extension-openweather.
@@ -34,6 +36,7 @@ const _ = Gettext.gettext;
 const Soup = imports.gi.Soup;
 
 const Lang = imports.lang;
+const Mainloop = imports.mainloop;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 const Config = imports.misc.config;
@@ -43,6 +46,7 @@ const EXTENSIONDIR = Me.dir.get_path();
 
 const OPENWEATHER_SETTINGS_SCHEMA = 'org.gnome.shell.extensions.openweather';
 const OPENWEATHER_PROVIDER_KEY = 'weather-provider';
+const OPENWEATHER_GEOLOCATION_PROVIDER_KEY = 'geolocation-provider';
 const OPENWEATHER_UNIT_KEY = 'unit';
 const OPENWEATHER_PRESSURE_UNIT_KEY = 'pressure-unit';
 const OPENWEATHER_WIND_SPEED_UNIT_KEY = 'wind-speed-unit';
@@ -63,16 +67,27 @@ const OPENWEATHER_DAYS_FORECAST = 'days-forecast';
 const OPENWEATHER_DECIMAL_PLACES = 'decimal-places';
 const OPENWEATHER_OWM_API_KEY = 'appid';
 const OPENWEATHER_FC_API_KEY = 'appid-fc';
+const OPENWEATHER_GC_APP_KEY = 'geolocation-appid-mapquest';
 
 //URL
-const OPENWEATHER_URL_BASE = 'https://open.mapquestapi.com/nominatim/v1/';
-const OPENWEATHER_URL_FIND = OPENWEATHER_URL_BASE + 'search.php';
-const OPENWEATHER_URL_REVERSE = OPENWEATHER_URL_BASE + 'reverse.php';
+const OPENWEATHER_URL_MAPQUEST_BASE = 'https://open.mapquestapi.com/nominatim/v1/';
+const OPENWEATHER_URL_MAPQUEST_FIND = OPENWEATHER_URL_MAPQUEST_BASE + 'search.php';
+const OPENWEATHER_URL_GEOCODE_BASE = 'https://www.geocode.farm/v3/';
+const OPENWEATHER_URL_GEOCODE_FIND = OPENWEATHER_URL_GEOCODE_BASE + 'json/forward';
+const OPENWEATHER_URL_OSM_BASE = 'https://nominatim.openstreetmap.org/';
+const OPENWEATHER_URL_OSM_FIND = OPENWEATHER_URL_OSM_BASE + 'search';
 
+// Keep enums in sync with GSettings schemas
 const WeatherProvider = {
     DEFAULT: -1,
     OPENWEATHERMAP: 0,
     FORECAST_IO: 1
+};
+
+const GeolocationProvider = {
+    OPENSTREETMAPS: 0,
+    GEOCODE: 1,
+    MAPQUEST: 2
 };
 
 let _httpSession;
@@ -90,6 +105,15 @@ const WeatherPrefsWidget = new GObject.Class({
 
     _init: function(params) {
         this.parent(params);
+
+        // Create user-agent string from uuid and (if present) the version
+        this.user_agent = Me.metadata.uuid;
+        if (Me.metadata.version !== undefined && Me.metadata.version.toString().trim() !== '') {
+            this.user_agent += '/';
+            this.user_agent += Me.metadata.version.toString();
+        }
+        // add trailing space, so libsoup adds its own user-agent
+        this.user_agent += ' ';
 
         this.initWindow();
 
@@ -110,8 +134,7 @@ const WeatherPrefsWidget = new GObject.Class({
                 return;
             inRealize = true;
 
-            this.MainWidget.get_toplevel().set_default_size(defaultSize[0], defaultSize[1]);
-            this.MainWidget.get_toplevel().reshow_with_initial_size();
+            this.MainWidget.get_toplevel().resize(defaultSize[0], defaultSize[1]);
             inRealize = false;
         }));
     },
@@ -168,11 +191,6 @@ const WeatherPrefsWidget = new GObject.Class({
             let location = this.searchName.get_text().trim();
             if (location === "")
                 return 0;
-            let params = {
-                format: 'json',
-                addressdetails: '1',
-                q: location
-            };
 
             let item = new Gtk.MenuItem();
             if (this.spinner.get_parent())
@@ -182,38 +200,192 @@ const WeatherPrefsWidget = new GObject.Class({
             this.searchMenu.show_all();
             this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
 
-            this.loadJsonAsync(OPENWEATHER_URL_FIND, params, Lang.bind(this, function() {
-                if (!arguments[0])
+            if (this.geolocation_provider == GeolocationProvider.OPENSTREETMAPS) {
+                let params = {
+                    format: 'json',
+                    addressdetails: '1',
+                    q: location
+                };
+
+                this.loadJsonAsync(OPENWEATHER_URL_OSM_FIND, params, Lang.bind(this, function() {
+                    this.clearSearchMenu();
+                    if (!arguments[0]) {
+                        let item = new Gtk.MenuItem({
+                            label: _("Invalid data when searching for \"%s\"").format(location)
+                        });
+                        this.searchMenu.append(item);
+                    } else {
+                        let newCity = arguments[0];
+
+                        if (Number(newCity.length) < 1) {
+                            let item = new Gtk.MenuItem({
+                                label: _("\"%s\" not found").format(location)
+                            });
+                            this.searchMenu.append(item);
+                        } else {
+                            var m = {};
+                            for (var i in newCity) {
+
+                                let cityText = newCity[i].display_name;
+                                let cityCoord = "[" + newCity[i].lat + "," + newCity[i].lon + "]";
+
+                                let item = new Gtk.MenuItem({
+                                    label: cityText + " " + cityCoord
+                                });
+                                item.connect("activate", Lang.bind(this, this.onActivateItem));
+                                this.searchMenu.append(item);
+                            }
+                        }
+                    }
+                    this.searchMenu.show_all();
+                    this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
                     return 0;
-
-                this.clearSearchMenu();
-
-                let newCity = arguments[0];
-
-                if (Number(newCity.length) < 1) {
+                }));
+            } else if (this.geolocation_provider == GeolocationProvider.MAPQUEST) {
+                if (this.geolocation_appid_mapquest === '') {
+                    this.clearSearchMenu();
                     let item = new Gtk.MenuItem({
-                        label: _("\"%s\" not found").format(location)
+                        label: "You need an AppKey to search on openmapquest."
                     });
                     this.searchMenu.append(item);
-                } else {
-                    var m = {};
-                    for (var i in newCity) {
-
-                        let cityText = newCity[i].display_name;
-                        let cityCoord = "[" + newCity[i].lat + "," + newCity[i].lon + "]";
-
-                        let item = new Gtk.MenuItem({
-                            label: cityText + " " + cityCoord
-                        });
-                        item.connect("activate", Lang.bind(this, this.onActivateItem));
-                        this.searchMenu.append(item);
-                    }
+                    item = new Gtk.MenuItem({
+                        label: "Please visit https://developer.mapquest.com/ ."
+                    });
+                    this.searchMenu.append(item);
+                    this.searchMenu.show_all();
+                    this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
+                    return 0;
                 }
-                this.searchMenu.show_all();
-                this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
-                return 0;
-            }));
+                let params = {
+                    key: this.geolocation_appid_mapquest,
+                    format: 'json',
+                    addressdetails: '1',
+                    q: location
+                };
+
+                this.loadJsonAsync(OPENWEATHER_URL_MAPQUEST_FIND, params, Lang.bind(this, function() {
+                    this.clearSearchMenu();
+                    if (!arguments[0]) {
+                        let item = new Gtk.MenuItem({
+                            label: _("Invalid data when searching for \"%s\"").format(location)
+                        });
+                        this.searchMenu.append(item);
+                        item = new Gtk.MenuItem({
+                            label: "Do you use a valid AppKey to search on openmapquest ?"
+                        });
+                        this.searchMenu.append(item);
+                        item = new Gtk.MenuItem({
+                            label: "If not, please visit https://developer.mapquest.com/ ."
+                        });
+                        this.searchMenu.append(item);
+                    } else {
+                        let newCity = arguments[0];
+
+                        if (Number(newCity.length) < 1) {
+                            let item = new Gtk.MenuItem({
+                                label: _("\"%s\" not found").format(location)
+                            });
+                            this.searchMenu.append(item);
+                        } else {
+                            var m = {};
+                            for (var i in newCity) {
+
+                                let cityText = newCity[i].display_name;
+                                let cityCoord = "[" + newCity[i].lat + "," + newCity[i].lon + "]";
+
+                                let item = new Gtk.MenuItem({
+                                    label: cityText + " " + cityCoord
+                                });
+                                item.connect("activate", Lang.bind(this, this.onActivateItem));
+                                this.searchMenu.append(item);
+                            }
+                        }
+                    }
+                    this.searchMenu.show_all();
+                    this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
+                    return 0;
+                }));
+            } else if (this.geolocation_provider == GeolocationProvider.GEOCODE) {
+                let params = {
+                    addr: location
+                };
+
+                this.loadJsonAsync(OPENWEATHER_URL_GEOCODE_FIND, params, Lang.bind(this, function() {
+                    this.clearSearchMenu();
+
+                    if (!arguments[0]) {
+                        let item = new Gtk.MenuItem({
+                            label: _("Invalid data when searching for \"%s\"").format(location)
+                        });
+                        this.searchMenu.append(item);
+                    } else {
+                        let newCity = arguments[0].geocoding_results;
+                        if (Number(newCity.length) < 1) {
+                            let item = new Gtk.MenuItem({
+                                label: _("Invalid data when searching for \"%s\"").format(location)
+                            });
+                            this.searchMenu.append(item);
+                        } else {
+                            if (Number(newCity.STATUS.result_count) < 1) {
+                                let item = new Gtk.MenuItem({
+                                    label: _("\"%s\" not found").format(location)
+                                });
+                                this.searchMenu.append(item);
+                            } else {
+                                var m = {};
+                                newCity = newCity.RESULTS;
+                                for (var i in newCity) {
+
+                                    let cityText = newCity[i].formatted_address;
+                                    let cityCoord = "[" + newCity[i].COORDINATES.latitude + "," + newCity[i].COORDINATES.longitude + "]";
+
+                                    let item = new Gtk.MenuItem({
+                                        label: cityText + " " + cityCoord
+                                    });
+                                    item.connect("activate", Lang.bind(this, this.onActivateItem));
+                                    this.searchMenu.append(item);
+                                }
+                            }
+
+                        }
+                    }
+
+                    this.searchMenu.show_all();
+                    this.searchMenu.popup(null, null, Lang.bind(this, this.placeSearchMenu), 0, this.searchName);
+                    return 0;
+                }));
+            }
             return 0;
+        }));
+
+        this.current_spin = this.Window.get_object("spin-current-refresh");
+        this.current_spin.set_value(this.refresh_interval_current / 60);
+        // prevent from continously updating the value
+        this.currentSpinTimeout = undefined;
+        this.current_spin.connect("value-changed", Lang.bind(this, function(button) {
+
+            if (this.currentSpinTimeout !== undefined)
+                Mainloop.source_remove(this.currentSpinTimeout);
+            this.currentSpinTimeout = Mainloop.timeout_add(250, Lang.bind(this, function() {
+                this.refresh_interval_current = 60 * button.get_value();
+                return false;
+            }));
+
+        }));
+
+        this.forecast_spin = this.Window.get_object("spin-forecast-refresh");
+        this.forecast_spin.set_value(this.refresh_interval_forecast / 60);
+        // prevent from continously updating the value
+        this.forecastSpinTimeout = undefined;
+        this.forecast_spin.connect("value-changed", Lang.bind(this, function(button) {
+
+            if (this.forecastSpinTimeout !== undefined)
+                Mainloop.source_remove(this.forecastSpinTimeout);
+            this.forecastSpinTimeout = Mainloop.timeout_add(250, Lang.bind(this, function() {
+                this.refresh_interval_forecast = 60 * button.get_value();
+                return false;
+            }));
+
         }));
 
         let column = new Gtk.TreeViewColumn();
@@ -476,6 +648,7 @@ const WeatherPrefsWidget = new GObject.Class({
     loadJsonAsync: function(url, params, fun, id) {
         if (_httpSession === undefined) {
             _httpSession = new Soup.Session();
+            _httpSession.user_agent = this.user_agent;
         }
 
         let here = this;
@@ -526,6 +699,18 @@ const WeatherPrefsWidget = new GObject.Class({
         if (!this.Settings)
             this.loadConfig();
         this.Settings.set_enum(OPENWEATHER_PROVIDER_KEY, v);
+    },
+
+    get geolocation_provider() {
+        if (!this.Settings)
+            this.loadConfig();
+        return this.Settings.get_enum(OPENWEATHER_GEOLOCATION_PROVIDER_KEY);
+    },
+
+    set geolocation_provider(v) {
+        if (!this.Settings)
+            this.loadConfig();
+        this.Settings.set_enum(OPENWEATHER_GEOLOCATION_PROVIDER_KEY, v);
     },
 
     get units() {
@@ -801,6 +986,18 @@ const WeatherPrefsWidget = new GObject.Class({
         if (!this.Settings)
             this.loadConfig();
         this.Settings.set_string(OPENWEATHER_FC_API_KEY, v);
+    },
+
+    get geolocation_appid_mapquest() {
+        if (!this.Settings)
+            this.loadConfig();
+        return this.Settings.get_string(OPENWEATHER_GC_APP_KEY);
+    },
+
+    set geolocation_appid_mapquest(v) {
+        if (!this.Settings)
+            this.loadConfig();
+        this.Settings.set_string(OPENWEATHER_GC_APP_KEY, v);
     },
 
     extractLocation: function() {

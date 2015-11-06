@@ -4,6 +4,11 @@
     <value value="0" nick="openweathermap"/>
     <value value="1" nick="forecast.io"/>
   </enum>
+  <enum id="org.gnome.shell.extensions.openweather.geolocation-provider">
+    <value value="0" nick="openstreetmaps"/>
+    <value value="1" nick="geocode"/>
+    <value value="2" nick="mapquest"/>
+  </enum>
   <enum id="org.gnome.shell.extensions.openweather.unit">
     <value value="0" nick="celsius"/>
     <value value="1" nick="fahrenheit"/>
@@ -24,6 +29,7 @@
     <value value="6" nick="at"/>
     <value value="7" nick="Torr"/>
     <value value="8" nick="psi"/>
+    <value value="9" nick="mmHg"/>
   </enum>
   <enum id="org.gnome.shell.extensions.openweather.wind-speed-unit">
     <value value="0" nick="kph"/>
@@ -46,6 +52,10 @@
     <key name="weather-provider" enum="org.gnome.shell.extensions.openweather.weather-provider">
       <default>'openweathermap'</default>
       <summary>Weather Provider</summary>
+    </key>
+    <key name="geolocation-provider" enum="org.gnome.shell.extensions.openweather.geolocation-provider">
+      <default>'openstreetmaps'</default>
+      <summary>Geolocation Provider</summary>
     </key>
     <key name="unit" enum="org.gnome.shell.extensions.openweather.unit">
       <default>'fahrenheit'</default>
@@ -128,6 +138,10 @@
     <key type="s" name="appid-fc">
       <default>''</default>
       <summary>Your personal API key from forecast.io</summary>
+    </key>
+    <key type="s" name="geolocation-appid-mapquest">
+      <default>''</default>
+      <summary>Your personal AppKey from developer.geocode.farm</summary>
     </key>
   </schema>
 </schemalist>

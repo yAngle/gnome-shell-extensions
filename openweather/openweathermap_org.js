@@ -5,7 +5,7 @@
  *  - Displays a small weather information on the top panel.
  *  - On click, gives a popup with details about the weather.
  *
- * Copyright (C) 2011 - 2015
+ * Copyright (C) 2011 - 2013
  *     ecyrbe <ecyrbe+spam@gmail.com>,
  *     Timur Kristof <venemo@msn.com>,
  *     Elad Alfassa <elad@fedoraproject.org>,
@@ -15,6 +15,8 @@
  *     Mattia Meneguzzo odysseus@fedoraproject.org,
  *     Meng Zhuo <mengzhuo1203+spam@gmail.com>,
  *     Jens Lody <jens@jenslody.de>
+ * Copyright (C) 2014 -2015
+ *     Jens Lody <jens@jenslody.de>,
  *
  *
  * This file is part of gnome-shell-extension-openweather.
@@ -290,9 +292,14 @@ function getWeatherCondition(code) {
 
 function parseWeatherCurrent() {
     if (this.currentWeatherCache === undefined) {
+        // this is a reentrency guard
+        this.currentWeatherCache = "in refresh";
         this.refreshWeatherCurrent();
         return;
     }
+
+    if (this.currentWeatherCache == "in refresh")
+        return;
 
     this.checkPositionInPanel();
 
@@ -406,9 +413,14 @@ function refreshWeatherCurrent() {
 
 function parseWeatherForecast() {
     if (this.forecastWeatherCache === undefined) {
+        // this is a reentrency guard
+        this.forecastWeatherCache = "in refresh";
         this.refreshWeatherForecast();
         return;
     }
+
+    if (this.forecastWeatherCache == "in refresh")
+        return;
 
     let forecast = this.forecastWeatherCache;
     let beginOfDay = new Date(new Date().setHours(0, 0, 0, 0));
