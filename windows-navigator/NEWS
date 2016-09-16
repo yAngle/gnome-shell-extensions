@@ -1,3 +1,45 @@
+3.20.0
+======
+* version bump, nothing to see here
+
+3.19.92
+=======
+* version bump, nothing to see here
+
+3.19.91
+=======
+* updated translations (oc)
+
+3.19.90
+=======
+* version bump, nothing to see here
+
+3.19.4
+======
+* screenshot-window-sizer: HiDPI support
+* Fix gnome-shell component in classic session
+* updated translations (lt)
+
+3.19.3
+======
+* native-window-placement: Don't let border overlap title
+* apps-menu: Fix handling of .desktop files in subdirectories
+* updated translations (is)
+
+3.19.2
+======
+* updated translations (gd)
+
+3.19.1
+======
+* Fix some theme issues
+
+3.18.1
+======
+* window-list: Fix accessibility of window buttons
+* apps-menu: Fix unreliable highlight
+* updated translations (ar)
+
 3.18.0
 ======
 * Bump version
