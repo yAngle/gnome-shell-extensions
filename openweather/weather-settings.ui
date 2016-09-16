@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.18.3 -->
+<!-- Generated with glade 3.20.0 -->
 <interface domain="gnome-shell-extension-openweather">
-  <requires lib="gtk+" version="3.12"/>
+  <requires lib="gtk+" version="3.8"/>
   <object class="GtkAdjustment" id="current-refresh-adjustment">
     <property name="lower">10</property>
     <property name="upper">1440</property>
@@ -169,6 +169,11 @@
     <property name="value">10</property>
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="menu-alignment-adjustment">
+    <property name="upper">100</property>
+    <property name="step_increment">0.10000000000000001</property>
+    <property name="page_increment">2</property>
   </object>
   <object class="GtkMenu" id="search-menu">
     <property name="visible">True</property>
@@ -348,7 +353,7 @@
     </data>
   </object>
   <object class="GtkScrolledWindow" id="main-widget">
-    <property name="width_request">720</property>
+    <property name="width_request">775</property>
     <property name="height_request">480</property>
     <property name="visible">True</property>
     <property name="can_focus">True</property>
@@ -365,7 +370,6 @@
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="scrollable">True</property>
-            <property name="enable_popup">True</property>
             <child>
               <object class="GtkBox" id="locations-box">
                 <property name="visible">True</property>
@@ -495,7 +499,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">1</property>
+                    <property name="top_attach">2</property>
                   </packing>
                 </child>
                 <child>
@@ -521,7 +525,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">1</property>
+                    <property name="top_attach">2</property>
                   </packing>
                 </child>
                 <child>
@@ -533,7 +537,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">2</property>
+                    <property name="top_attach">3</property>
                   </packing>
                 </child>
                 <child>
@@ -546,7 +550,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">2</property>
+                    <property name="top_attach">3</property>
                   </packing>
                 </child>
                 <child>
@@ -560,7 +564,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">4</property>
+                    <property name="top_attach">5</property>
                   </packing>
                 </child>
                 <child>
@@ -574,7 +578,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">5</property>
+                    <property name="top_attach">6</property>
                   </packing>
                 </child>
                 <child>
@@ -590,7 +594,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">4</property>
+                    <property name="top_attach">5</property>
                   </packing>
                 </child>
                 <child>
@@ -606,7 +610,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">5</property>
+                    <property name="top_attach">6</property>
                   </packing>
                 </child>
                 <child>
@@ -616,8 +620,32 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">3</property>
+                    <property name="top_attach">4</property>
                     <property name="width">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="label-use-default-owm-appid">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="halign">start</property>
+                    <property name="label" translatable="yes">Use extensions api-key for openweathermap.org</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSwitch" id="use_default_owm_key">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="tooltip_text" translatable="yes">Switch off, if you have your own api-key for openweathermap.org and put it into the text-box below.</property>
+                    <property name="halign">center</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">1</property>
                   </packing>
                 </child>
               </object>
@@ -758,14 +786,14 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <items>
-                      <item>°C</item>
-                      <item>°F</item>
-                      <item>K</item>
-                      <item>°Ra</item>
-                      <item>°Ré</item>
-                      <item>°Rø</item>
-                      <item>°De</item>
-                      <item>°N</item>
+                      <item translatable="yes">°C</item>
+                      <item translatable="yes">°F</item>
+                      <item translatable="yes">K</item>
+                      <item translatable="yes">°Ra</item>
+                      <item translatable="yes">°Ré</item>
+                      <item translatable="yes">°Rø</item>
+                      <item translatable="yes">°De</item>
+                      <item translatable="yes">°N</item>
                     </items>
                   </object>
                   <packing>
@@ -778,12 +806,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <items>
-                      <item>km/h</item>
-                      <item>mph</item>
-                      <item>m/s</item>
-                      <item>kn</item>
-                      <item>ft/s</item>
-                      <item>Beaufort</item>
+                      <item translatable="yes">km/h</item>
+                      <item translatable="yes">mph</item>
+                      <item translatable="yes">m/s</item>
+                      <item translatable="yes">kn</item>
+                      <item translatable="yes">ft/s</item>
+                      <item translatable="yes">Beaufort</item>
                     </items>
                   </object>
                   <packing>
@@ -796,16 +824,16 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <items>
-                      <item>hPa</item>
-                      <item>inHg</item>
-                      <item>bar</item>
-                      <item>Pa</item>
-                      <item>kPa</item>
-                      <item>atm</item>
-                      <item>at</item>
-                      <item>Torr</item>
-                      <item>psi</item>
-                      <item>mmHg</item>
+                      <item translatable="yes">hPa</item>
+                      <item translatable="yes">inHg</item>
+                      <item translatable="yes">bar</item>
+                      <item translatable="yes">Pa</item>
+                      <item translatable="yes">kPa</item>
+                      <item translatable="yes">atm</item>
+                      <item translatable="yes">at</item>
+                      <item translatable="yes">Torr</item>
+                      <item translatable="yes">psi</item>
+                      <item translatable="yes">mmHg</item>
                     </items>
                   </object>
                   <packing>
@@ -850,6 +878,17 @@
                   </packing>
                 </child>
                 <child>
+                  <object class="GtkLabel" id="label-menu-alignment">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="label" translatable="yes">Position of menu-box [%] from 0 (left) to 100 (right)</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
                   <object class="GtkLabel" id="label-wind-direction">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
@@ -857,7 +896,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">1</property>
+                    <property name="top_attach">2</property>
                   </packing>
                 </child>
                 <child>
@@ -868,7 +907,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">2</property>
+                    <property name="top_attach">3</property>
                   </packing>
                 </child>
                 <child>
@@ -879,7 +918,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">3</property>
+                    <property name="top_attach">4</property>
                   </packing>
                 </child>
                 <child>
@@ -890,7 +929,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">4</property>
+                    <property name="top_attach">5</property>
                   </packing>
                 </child>
                 <child>
@@ -901,7 +940,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">5</property>
+                    <property name="top_attach">6</property>
                   </packing>
                 </child>
                 <child>
@@ -912,7 +951,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">6</property>
+                    <property name="top_attach">7</property>
                   </packing>
                 </child>
                 <child>
@@ -923,7 +962,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">7</property>
+                    <property name="top_attach">8</property>
                   </packing>
                 </child>
                 <child>
@@ -934,7 +973,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">8</property>
+                    <property name="top_attach">9</property>
                   </packing>
                 </child>
                 <child>
@@ -945,7 +984,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">9</property>
+                    <property name="top_attach">10</property>
                   </packing>
                 </child>
                 <child>
@@ -956,7 +995,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">0</property>
-                    <property name="top_attach">10</property>
+                    <property name="top_attach">11</property>
                   </packing>
                 </child>
                 <child>
@@ -975,10 +1014,16 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="wind_direction">
+                  <object class="GtkScale" id="menu_alignment">
+                    <property name="width_request">200</property>
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
-                    <property name="halign">center</property>
+                    <property name="hexpand">True</property>
+                    <property name="adjustment">menu-alignment-adjustment</property>
+                    <property name="show_fill_level">True</property>
+                    <property name="restrict_to_fill_level">False</property>
+                    <property name="fill_level">100</property>
+                    <property name="digits">2</property>
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
@@ -986,7 +1031,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="translate_condition">
+                  <object class="GtkSwitch" id="wind_direction">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -997,7 +1042,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="icon_type">
+                  <object class="GtkSwitch" id="translate_condition">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1008,7 +1053,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="use_text_on_buttons">
+                  <object class="GtkSwitch" id="icon_type">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1019,7 +1064,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="text_in_panel">
+                  <object class="GtkSwitch" id="use_text_on_buttons">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1030,7 +1075,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="comment_in_panel">
+                  <object class="GtkSwitch" id="text_in_panel">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1041,7 +1086,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="comment_in_forecast">
+                  <object class="GtkSwitch" id="comment_in_panel">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1052,7 +1097,7 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSwitch" id="center_forecast">
+                  <object class="GtkSwitch" id="comment_in_forecast">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="halign">center</property>
@@ -1060,6 +1105,17 @@
                   <packing>
                     <property name="left_attach">1</property>
                     <property name="top_attach">8</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSwitch" id="center_forecast">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="halign">center</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">9</property>
                   </packing>
                 </child>
                 <child>
@@ -1080,7 +1136,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">9</property>
+                    <property name="top_attach">10</property>
                   </packing>
                 </child>
                 <child>
@@ -1096,7 +1152,7 @@
                   </object>
                   <packing>
                     <property name="left_attach">1</property>
-                    <property name="top_attach">10</property>
+                    <property name="top_attach">11</property>
                   </packing>
                 </child>
               </object>
@@ -1116,7 +1172,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkBox" id="about">
+              <object class="GtkBox" id="about-box">
                 <property name="can_focus">False</property>
                 <property name="margin_top">24</property>
                 <property name="margin_bottom">24</property>
@@ -1141,7 +1197,7 @@
                   <object class="GtkLabel" id="extension-label">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="label">&lt;b&gt;OPenweather&lt;/b&gt;</property>
+                    <property name="label">&lt;b&gt;Openweather&lt;/b&gt;</property>
                     <property name="use_markup">True</property>
                   </object>
                   <packing>

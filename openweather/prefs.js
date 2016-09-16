@@ -5,7 +5,7 @@
  *  - Creates a widget to set the preferences of the weather extension
  *
  * Copyright (C) 2012 - 2013
- *     Canek Peláez <canek@ciencias.unam.mx>,
+ *     Canek Pelaez <canek@ciencias.unam.mx>,
  *     Christian METZLER <neroth@xeked.com>,
  *     Jens Lody <jens@jenslody.de>,
  * Copyright (C) 2014 -2015
@@ -58,6 +58,7 @@ const OPENWEATHER_USE_SYMBOLIC_ICONS_KEY = 'use-symbolic-icons';
 const OPENWEATHER_USE_TEXT_ON_BUTTONS_KEY = 'use-text-on-buttons';
 const OPENWEATHER_SHOW_TEXT_IN_PANEL_KEY = 'show-text-in-panel';
 const OPENWEATHER_POSITION_IN_PANEL_KEY = 'position-in-panel';
+const OPENWEATHER_MENU_ALIGNMENT_KEY = 'menu-alignment';
 const OPENWEATHER_SHOW_COMMENT_IN_PANEL_KEY = 'show-comment-in-panel';
 const OPENWEATHER_SHOW_COMMENT_IN_FORECAST_KEY = 'show-comment-in-forecast';
 const OPENWEATHER_REFRESH_INTERVAL_CURRENT = 'refresh-interval-current';
@@ -65,6 +66,7 @@ const OPENWEATHER_REFRESH_INTERVAL_FORECAST = 'refresh-interval-forecast';
 const OPENWEATHER_CENTER_FORECAST_KEY = 'center-forecast';
 const OPENWEATHER_DAYS_FORECAST = 'days-forecast';
 const OPENWEATHER_DECIMAL_PLACES = 'decimal-places';
+const OPENWEATHER_USE_DEFAULT_OWM_API_KEY = 'use-default-owm-key';
 const OPENWEATHER_OWM_API_KEY = 'appid';
 const OPENWEATHER_FC_API_KEY = 'appid-fc';
 const OPENWEATHER_GC_APP_KEY = 'geolocation-appid-mapquest';
@@ -419,6 +421,8 @@ const WeatherPrefsWidget = new GObject.Class({
                     this.initComboBox(theObjects[i]);
                 else if (theObjects[i].class_path()[1].indexOf('GtkSwitch') != -1)
                     this.initSwitch(theObjects[i]);
+                else if (theObjects[i].class_path()[1].indexOf('GtkScale') != -1)
+                    this.initScale(theObjects[i]);
                 this.configWidgets.push([theObjects[i], name]);
             }
         }
@@ -475,6 +479,21 @@ const WeatherPrefsWidget = new GObject.Class({
         theSwitch.connect("notify::active", Lang.bind(this, function() {
             this[name] = arguments[0].active;
         }));
+    },
+
+    initScale: function(theScale) {
+        let name = theScale.get_name();
+        theScale.set_value(this[name]);
+        this[name+'Timeout'] = undefined;
+        theScale.connect("value-changed", Lang.bind(this, function(slider) {
+            if (this[name+'Timeout'] !== undefined)
+                Mainloop.source_remove(this[name+'Timeout']);
+            this[name+'Timeout'] = Mainloop.timeout_add(250, Lang.bind(this, function() {
+                this[name] = slider.get_value();
+                return false;
+            }));
+        }));
+
     },
 
     refreshUI: function() {
@@ -878,6 +897,18 @@ const WeatherPrefsWidget = new GObject.Class({
         this.Settings.set_enum(OPENWEATHER_POSITION_IN_PANEL_KEY, v);
     },
 
+    get menu_alignment() {
+        if (!this.Settings)
+            this.loadConfig();
+        return this.Settings.get_double(OPENWEATHER_MENU_ALIGNMENT_KEY);
+    },
+
+    set menu_alignment(v) {
+        if (!this.Settings)
+            this.loadConfig();
+        return this.Settings.set_double(OPENWEATHER_MENU_ALIGNMENT_KEY, v);
+    },
+
     get comment_in_panel() {
         if (!this.Settings)
             this.loadConfig();
@@ -974,6 +1005,18 @@ const WeatherPrefsWidget = new GObject.Class({
         if (!this.Settings)
             this.loadConfig();
         this.Settings.set_string(OPENWEATHER_OWM_API_KEY, v);
+    },
+
+    get use_default_owm_key() {
+        if (!this.Settings)
+            this.loadConfig();
+        return this.Settings.get_boolean(OPENWEATHER_USE_DEFAULT_OWM_API_KEY);
+    },
+
+    set use_default_owm_key(v) {
+        if (!this.Settings)
+            this.loadConfig();
+        this.Settings.set_boolean(OPENWEATHER_USE_DEFAULT_OWM_API_KEY, v);
     },
 
     get appid_fc() {

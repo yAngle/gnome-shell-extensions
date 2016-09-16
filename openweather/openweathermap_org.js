@@ -301,6 +301,7 @@ function parseWeatherCurrent() {
     if (this.currentWeatherCache == "in refresh")
         return;
 
+    this.checkAlignment();
     this.checkPositionInPanel();
 
     let json = this.currentWeatherCache;
@@ -362,9 +363,9 @@ function parseWeatherCurrent() {
     if (this._text_in_panel)
         weatherInfoT = temperature;
 
-    this._weatherInfo.text = weatherInfoC + ((weatherInfoC && weatherInfoT) ? ", " : "") + weatherInfoT;
+    this._weatherInfo.text = weatherInfoC + ((weatherInfoC && weatherInfoT) ? _(", ") : "") + weatherInfoT;
 
-    this._currentWeatherSummary.text = comment + ", " + temperature;
+    this._currentWeatherSummary.text = comment + _(", ") + temperature;
     this._currentWeatherLocation.text = location;
     this._currentWeatherCloudiness.text = json.clouds.all + ' %';
     this._currentWeatherHumidity.text = json.main.humidity + ' %';

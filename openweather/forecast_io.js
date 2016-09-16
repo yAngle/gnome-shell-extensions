@@ -44,7 +44,7 @@ const ngettext = Gettext.ngettext;
 const OPENWEATHER_URL_HOST = 'api.forecast.io';
 const OPENWEATHER_URL_BASE = 'https://' + OPENWEATHER_URL_HOST + '/forecast/';
 
-function getWeatherIcon(icon) {
+function getWeatherIcon(icon, windspeed, cloudcover, night) {
     //    clear-day             weather-clear-day
     //    clear-night           weather-clear-night
     //    rain                  weather-showers
@@ -56,6 +56,15 @@ function getWeatherIcon(icon) {
     //    partly-cloudy-day     weather-few-clouds
     //    partly-cloudy-night   weather-few-clouds-night
     let iconname = ['weather-severe-alert'];
+    if ((icon == 'wind') && (windspeed < 39)) {
+        if (cloudcover < 0.3)
+            icon = 'clear-' + (night ? 'night' : 'day');
+        else if (cloudcover < 0.7)
+            icon = 'partly-cloudy-' + (night ? 'night' : 'day');
+        else
+            icon = 'cloudy';
+    }
+
     switch (icon) {
         case 'wind':
             iconname = ['weather-storm'];
@@ -87,7 +96,7 @@ function getWeatherIcon(icon) {
             break;
     }
     for (let i = 0; i < iconname.length; i++) {
-        if (this.hasIcon(iconname[i]))
+        if (this.hasIcon(iconname[i]) + this.getIconType())
             return iconname[i] + this.getIconType();
     }
     return 'weather-severe-alert' + this.getIconType();
@@ -111,6 +120,7 @@ function parseWeatherCurrent() {
         (this.currentWeatherCache == "in refresh"))
         return;
 
+    this.checkAlignment();
     this.checkPositionInPanel();
 
     let json = this.currentWeatherCache;
@@ -124,8 +134,6 @@ function parseWeatherCurrent() {
     let temperature = this.formatTemperature(json.temperature);
 
     let now = new Date();
-
-    let iconname = this.getWeatherIcon(json.icon);
 
     if (this.lastBuildId === undefined)
         this.lastBuildId = 0;
@@ -155,8 +163,6 @@ function parseWeatherCurrent() {
         }
     }
 
-    this._currentWeatherIcon.icon_name = this._weatherIcon.icon_name = iconname;
-
     let weatherInfoC = "";
     let weatherInfoT = "";
     if (this._comment_in_panel)
@@ -165,9 +171,9 @@ function parseWeatherCurrent() {
     if (this._text_in_panel)
         weatherInfoT = temperature;
 
-    this._weatherInfo.text = weatherInfoC + ((weatherInfoC && weatherInfoT) ? ", " : "") + weatherInfoT;
+    this._weatherInfo.text = weatherInfoC + ((weatherInfoC && weatherInfoT) ? _(", ") : "") + weatherInfoT;
 
-    this._currentWeatherSummary.text = comment + ", " + temperature;
+    this._currentWeatherSummary.text = comment + _(", ") + temperature;
     this._currentWeatherLocation.text = location;
     this._currentWeatherCloudiness.text = parseInt(json.cloudCover * 100) + ' %';
     this._currentWeatherHumidity.text = parseInt(json.humidity * 100) + ' %';
@@ -178,6 +184,15 @@ function parseWeatherCurrent() {
     this._currentWeatherWind.text = this.formatWind(json.windSpeed, this.getWindDirection(json.windBearing));
 
     this.parseWeatherForecast();
+
+    // get weather icon last, because we might need sunrise and sunset to know whether it's day or night
+    let iconname = this.getWeatherIcon(json.icon,
+        json.windSpeed,
+        json.cloudCover,
+        now < this._currentWeatherSunrise.text || now > this._currentWeatherSunset.text);
+
+    this._currentWeatherIcon.icon_name = this._weatherIcon.icon_name = iconname;
+
     this.recalcLayout();
 }
 
@@ -279,6 +294,9 @@ function parseWeatherForecast() {
         forecastUi.Day.text = date_string + ' (' + this.getLocaleDay(forecastDate.getDay()) + ')\n' + forecastDate.toLocaleDateString();
         forecastUi.Temperature.text = '\u2193 ' + t_low + '    \u2191 ' + t_high;
         forecastUi.Summary.text = comment;
-        forecastUi.Icon.icon_name = this.getWeatherIcon(forecastData.icon);
+
+        forecastUi.Icon.icon_name = this.getWeatherIcon(forecastData.icon,
+            forecastData.windSpeed,
+            forecastData.cloudCover);
     }
 }

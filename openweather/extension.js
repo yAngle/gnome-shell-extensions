@@ -74,6 +74,7 @@ const OPENWEATHER_USE_SYMBOLIC_ICONS_KEY = 'use-symbolic-icons';
 const OPENWEATHER_USE_TEXT_ON_BUTTONS_KEY = 'use-text-on-buttons';
 const OPENWEATHER_SHOW_TEXT_IN_PANEL_KEY = 'show-text-in-panel';
 const OPENWEATHER_POSITION_IN_PANEL_KEY = 'position-in-panel';
+const OPENWEATHER_MENU_ALIGNMENT_KEY = 'menu-alignment';
 const OPENWEATHER_SHOW_COMMENT_IN_PANEL_KEY = 'show-comment-in-panel';
 const OPENWEATHER_SHOW_COMMENT_IN_FORECAST_KEY = 'show-comment-in-forecast';
 const OPENWEATHER_REFRESH_INTERVAL_CURRENT = 'refresh-interval-current';
@@ -81,7 +82,9 @@ const OPENWEATHER_REFRESH_INTERVAL_FORECAST = 'refresh-interval-forecast';
 const OPENWEATHER_CENTER_FORECAST_KEY = 'center-forecast';
 const OPENWEATHER_DAYS_FORECAST = 'days-forecast';
 const OPENWEATHER_DECIMAL_PLACES = 'decimal-places';
+const OPENWEATHER_USE_DEFAULT_OWM_API_KEY = 'use-default-owm-key';
 const OPENWEATHER_OWM_API_KEY = 'appid';
+const OPENWEATHER_OWM_DEFAULT_API_KEY = 'c93b4a667c8c9d1d1eb941621f899bb8';
 const OPENWEATHER_FC_API_KEY = 'appid-fc';
 
 // Keep enums in sync with GSettings schemas
@@ -157,6 +160,7 @@ const OpenweatherMenuButton = new Lang.Class({
         this.user_agent += ' ';
 
         this.oldProvider = this._weather_provider;
+        this.oldUseDefaultOwmKey = this._use_default_owm_key;
         this.oldTranslateCondition = this._translate_condition;
         this.switchProvider();
 
@@ -175,7 +179,7 @@ const OpenweatherMenuButton = new Lang.Class({
         });
 
         // Panel menu item - the current class
-        let menuAlignment = 0.25;
+        let menuAlignment = 1.0 - (this._menu_alignment / 100);
         if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
             menuAlignment = 1.0 - menuAlignment;
         this.parent(menuAlignment);
@@ -228,8 +232,13 @@ const OpenweatherMenuButton = new Lang.Class({
             reactive: false
         });
 
-        _itemCurrent.actor.add_actor(this._currentWeather);
-        _itemFuture.actor.add_actor(this._futureWeather);
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            _itemCurrent.addActor(this._currentWeather);
+            _itemFuture.addActor(this._futureWeather);
+        } else {
+            _itemCurrent.actor.add_actor(this._currentWeather);
+            _itemFuture.actor.add_actor(this._futureWeather);
+        }
 
         this.menu.addMenuItem(_itemCurrent);
 
@@ -291,6 +300,13 @@ const OpenweatherMenuButton = new Lang.Class({
         this._checkConnectionState();
 
         this.menu.connect('open-state-changed', Lang.bind(this, this.recalcLayout));
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            this._needsColorUpdate = true;
+            let context = St.ThemeContext.get_for_stage(global.stage);
+            this._globalThemeChangedId = context.connect('changed', Lang.bind(this, function() {
+                this._needsColorUpdate = true;
+            }));
+        }
     },
 
     _onStatusChanged: function(status) {
@@ -321,7 +337,7 @@ const OpenweatherMenuButton = new Lang.Class({
         this._timeoutForecast = undefined;
 
         if (this._presence_connection) {
-            this._presence.disconnect(this._presence_connection);
+            this._presence.disconnectSignal(this._presence_connection);
             this._presence_connection = undefined;
         }
 
@@ -364,7 +380,7 @@ const OpenweatherMenuButton = new Lang.Class({
         this.weatherProvider = "https://openweathermap.org/";
 
         if (this._appid.toString().trim() === '')
-            Main.notify("Openweather", _("Openweathermap.org does not work without an api-key.\nPlease register at http://openweathermap.org/appid and paste your personal key into the preferences dialog."));
+            Main.notify("Openweather", _("Openweathermap.org does not work without an api-key.\nEither set the switch to use the extensions default key in the preferences dialog to on or register at http://openweathermap.org/appid and paste your personal key into the preferences dialog."));
 
     },
 
@@ -382,19 +398,28 @@ const OpenweatherMenuButton = new Lang.Class({
         if (this._translate_condition) {
             let fc_locales = [
                 'ar',
+                'az',
+                'be',
                 'bs',
+                'cz',
                 'de',
                 'el',
                 'en',
                 'es',
                 'fr',
                 'hr',
+                'hu',
+                'id',
                 'it',
+                'is',
+                'kw',
+                'nb',
                 'nl',
                 'pl',
                 'pt',
                 'ru',
                 'sk',
+                'sr',
                 'sv',
                 'tet',
                 'tr',
@@ -519,6 +544,13 @@ const OpenweatherMenuButton = new Lang.Class({
             this.oldProvider = provider;
             return true;
         }
+        if (provider == WeatherProvider.OPENWEATHERMAP) {
+            let useDefaultOwmKey = this._use_default_owm_key;
+            if (this.oldUseDefaultOwmKey != useDefaultOwmKey) {
+                this.oldUseDefaultOwmKey = useDefaultOwmKey;
+                return true;
+            }
+        }
         if (provider == WeatherProvider.FORECAST_IO) {
             let translateCondition = this._translate_condition;
             if (this.oldTranslateCondition != translateCondition) {
@@ -581,6 +613,63 @@ const OpenweatherMenuButton = new Lang.Class({
         if (!this._settings)
             this.loadConfig();
         return this._settings.set_string(OPENWEATHER_CITY_KEY, v);
+    },
+
+   _onButtonHoverChanged: function(actor, event) {
+        if (actor.hover) {
+            actor.add_style_pseudo_class('hover');
+            actor.set_style(this._button_background_style);
+        } else {
+            actor.remove_style_pseudo_class('hover');
+            actor.set_style('background-color:;');
+            if (actor != this._urlButton)
+                actor.set_style(this._button_border_style);
+        }
+    },
+
+    _updateButtonColors: function() {
+        if (!this._needsColorUpdate)
+            return;
+        this._needsColorUpdate = false;
+        let color = this._separatorItem._separator.actor.get_theme_node().get_color('-gradient-end');
+
+        let alpha = (Math.round(color.alpha / 2.55) / 100);
+
+        if (color.red > 0 && color.green > 0 && color.blue > 0)
+            this._button_border_style = 'border:1px solid rgb(' + Math.round(alpha * color.red) + ',' + Math.round(alpha * color.green) + ',' + Math.round(alpha * color.blue) + ');';
+        else
+            this._button_border_style = 'border:1px solid rgba(' + color.red + ',' + color.green + ',' + color.blue + ',' + alpha + ');';
+
+        this._locationButton.set_style(this._button_border_style);
+        this._reloadButton.set_style(this._button_border_style);
+        this._prefsButton.set_style(this._button_border_style);
+
+        this._buttonMenu.actor.add_style_pseudo_class('active');
+        color = this._buttonMenu.actor.get_theme_node().get_background_color();
+        this._button_background_style = 'background-color:rgba(' + color.red + ',' + color.green + ',' + color.blue + ',' + (Math.round(color.alpha / 2.55) / 100) + ');';
+        this._buttonMenu.actor.remove_style_pseudo_class('active');
+    },
+
+
+    createButton: function(iconName, accessibleName) {
+        let button;
+
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            button = new St.Button({
+                reactive: true,
+                can_focus: true,
+                track_hover: true,
+                accessible_name: accessibleName,
+                style_class: 'popup-menu-item openweather-button'
+            });
+            button.child = new St.Icon({
+                icon_name: iconName
+            });
+            button.connect('notify::hover', Lang.bind(this, this._onButtonHoverChanged));
+        } else
+            button = Main.panel.statusArea.aggregateMenu._system._createActionButton(iconName, accessibleName);
+
+        return button;
     },
 
     get _actual_city() {
@@ -670,6 +759,12 @@ const OpenweatherMenuButton = new Lang.Class({
         return this._settings.get_enum(OPENWEATHER_POSITION_IN_PANEL_KEY);
     },
 
+    get _menu_alignment() {
+        if (!this._settings)
+            this.loadConfig();
+        return this._settings.get_double(OPENWEATHER_MENU_ALIGNMENT_KEY);
+    },
+
     get _comment_in_panel() {
         if (!this._settings)
             this.loadConfig();
@@ -717,8 +812,18 @@ const OpenweatherMenuButton = new Lang.Class({
     get _appid() {
         if (!this._settings)
             this.loadConfig();
-        let key = this._settings.get_string(OPENWEATHER_OWM_API_KEY);
+        let key = '';
+        if (this._use_default_owm_key)
+            key = OPENWEATHER_OWM_DEFAULT_API_KEY;
+        else
+            key = this._settings.get_string(OPENWEATHER_OWM_API_KEY);
         return (key.length == 32) ? key : '';
+    },
+
+    get _use_default_owm_key() {
+        if (!this._settings)
+            this.loadConfig();
+        return this._settings.get_boolean(OPENWEATHER_USE_DEFAULT_OWM_API_KEY);
     },
 
     get _appid_fc() {
@@ -753,19 +858,22 @@ const OpenweatherMenuButton = new Lang.Class({
             this._buttonBox2 = undefined;
         }
 
-        this._locationButton = Main.panel.statusArea.aggregateMenu._system._createActionButton('find-location-symbolic', _("Locations"));
+        this._locationButton = this.createButton('find-location-symbolic', _("Locations"));
         if (this._use_text_on_buttons)
             this._locationButton.set_label(this._locationButton.get_accessible_name());
 
         this._locationButton.connect('clicked', Lang.bind(this, function() {
-            this._selectCity._setOpenState(!this._selectCity._getOpenState());
+            if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION))
+                this._selectCity.menu.toggle();
+            else
+                this._selectCity._setOpenState(!this._selectCity._getOpenState());
         }));
         this._buttonBox1 = new St.BoxLayout({
             style_class: 'openweather-button-box'
         });
         this._buttonBox1.add_actor(this._locationButton);
 
-        this._reloadButton = Main.panel.statusArea.aggregateMenu._system._createActionButton('view-refresh-symbolic', _("Reload Weather Information"));
+        this._reloadButton = this.createButton('view-refresh-symbolic', _("Reload Weather Information"));
         if (this._use_text_on_buttons)
             this._reloadButton.set_label(this._reloadButton.get_accessible_name());
         this._reloadButton.connect('clicked', Lang.bind(this, function() {
@@ -780,8 +888,13 @@ const OpenweatherMenuButton = new Lang.Class({
             style_class: 'openweather-button-box'
         });
 
-        this._urlButton = Main.panel.statusArea.aggregateMenu._system._createActionButton('', _("Weather data provided by:") + (this._use_text_on_buttons ? "\n" : "  ") + this.weatherProvider);
+        this._urlButton = this.createButton('', _("Weather data provided by:") + (this._use_text_on_buttons ? "\n" : "  ") + this.weatherProvider);
         this._urlButton.set_label(this._urlButton.get_accessible_name());
+
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            this._urlButton.connect('notify::hover', Lang.bind(this, this._onButtonHoverChanged));
+            this._urlButton.style_class = 'popup-menu-item';
+        }
         this._urlButton.style_class += ' openweather-provider';
 
         this._urlButton.connect('clicked', Lang.bind(this, function() {
@@ -798,15 +911,25 @@ const OpenweatherMenuButton = new Lang.Class({
 
         this._buttonBox2.add_actor(this._urlButton);
 
-        this._prefsButton = Main.panel.statusArea.aggregateMenu._system._createActionButton('preferences-system-symbolic', _("Weather Settings"));
+        this._prefsButton = this.createButton('preferences-system-symbolic', _("Weather Settings"));
         if (this._use_text_on_buttons)
             this._prefsButton.set_label(this._prefsButton.get_accessible_name());
         this._prefsButton.connect('clicked', Lang.bind(this, this._onPreferencesActivate));
         this._buttonBox2.add_actor(this._prefsButton);
 
-        this._buttonMenu.actor.add_actor(this._buttonBox1);
-        this._buttonMenu.actor.add_actor(this._buttonBox2);
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            this._buttonBox = new St.BoxLayout();
+            this._buttonBox1.add_style_class_name('openweather-button-box-38');
+            this._buttonBox2.add_style_class_name('openweather-button-box-38');
+            this._buttonBox.add_actor(this._buttonBox1);
+            this._buttonBox.add_actor(this._buttonBox2);
 
+            this._buttonMenu.addActor(this._buttonBox);
+            this._needsColorUpdate = true;
+        } else {
+            this._buttonMenu.actor.add_actor(this._buttonBox1);
+            this._buttonMenu.actor.add_actor(this._buttonBox2);
+        }
         this._buttonBox1MinWidth = undefined;
     },
 
@@ -825,7 +948,10 @@ const OpenweatherMenuButton = new Lang.Class({
             item = new PopupMenu.PopupMenuItem(this.extractLocation(cities[i]));
             item.location = i;
             if (i == this._actual_city) {
-                item.setOrnament(PopupMenu.Ornament.DOT);
+                if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION))
+                    item.setShowDot(true);
+                else
+                    item.setOrnament(PopupMenu.Ornament.DOT);
             }
 
             this._selectCity.menu.addMenuItem(item);
@@ -886,6 +1012,9 @@ const OpenweatherMenuButton = new Lang.Class({
     recalcLayout: function() {
         if (!this.menu.isOpen)
             return;
+        if (ExtensionUtils.versionCheck(['3.8'], Config.PACKAGE_VERSION)) {
+            this._updateButtonColors();
+        }
         if (this._buttonBox1MinWidth === undefined)
             this._buttonBox1MinWidth = this._buttonBox1.get_width();
         this._buttonBox1.set_width(Math.max(this._buttonBox1MinWidth, this._currentWeather.get_width() - this._buttonBox2.get_width()));
@@ -904,21 +1033,21 @@ const OpenweatherMenuButton = new Lang.Class({
 
     unit_to_unicode: function() {
         if (this._units == WeatherUnits.FAHRENHEIT)
-            return '\u00B0F';
+            return _('\u00B0F');
         else if (this._units == WeatherUnits.KELVIN)
-            return 'K';
+            return _('K');
         else if (this._units == WeatherUnits.RANKINE)
-            return '\u00B0Ra';
+            return _('\u00B0Ra');
         else if (this._units == WeatherUnits.REAUMUR)
-            return '\u00B0R\u00E9';
+            return _('\u00B0R\u00E9');
         else if (this._units == WeatherUnits.ROEMER)
-            return '\u00B0R\u00F8';
+            return _('\u00B0R\u00F8');
         else if (this._units == WeatherUnits.DELISLE)
-            return '\u00B0De';
+            return _('\u00B0De');
         else if (this._units == WeatherUnits.NEWTON)
-            return '\u00B0N';
+            return _('\u00B0N');
         else
-            return '\u00B0C';
+            return _('\u00B0C');
     },
 
     hasIcon: function(icon) {
@@ -1056,6 +1185,13 @@ const OpenweatherMenuButton = new Lang.Class({
         return;
     },
 
+    checkAlignment: function() {
+        let menuAlignment = 1.0 - (this._menu_alignment / 100);
+        if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
+            menuAlignment = 1.0 - menuAlignment;
+        this.menu._arrowAlignment=menuAlignment;
+    },
+
     checkPositionInPanel: function() {
         if (this._old_position_in_panel != this._position_in_panel) {
             switch (this._old_position_in_panel) {
@@ -1091,56 +1227,56 @@ const OpenweatherMenuButton = new Lang.Class({
     },
 
     formatPressure: function(pressure) {
-        let pressure_unit = 'hPa';
+        let pressure_unit = _('hPa');
         switch (this._pressure_units) {
             case WeatherPressureUnits.INHG:
                 pressure = this.toInHg(pressure);
-                pressure_unit = "inHg";
+                pressure_unit = _("inHg");
                 break;
 
             case WeatherPressureUnits.HPA:
                 pressure = pressure.toFixed(this._decimal_places);
-                pressure_unit = "hPa";
+                pressure_unit = _("hPa");
                 break;
 
             case WeatherPressureUnits.BAR:
                 pressure = (pressure / 1000).toFixed(this._decimal_places);
-                pressure_unit = "bar";
+                pressure_unit = _("bar");
                 break;
 
             case WeatherPressureUnits.PA:
                 pressure = (pressure * 100).toFixed(this._decimal_places);
-                pressure_unit = "Pa";
+                pressure_unit = _("Pa");
                 break;
 
             case WeatherPressureUnits.KPA:
                 pressure = (pressure / 10).toFixed(this._decimal_places);
-                pressure_unit = "kPa";
+                pressure_unit = _("kPa");
                 break;
 
             case WeatherPressureUnits.ATM:
                 pressure = (pressure * 0.000986923267).toFixed(this._decimal_places);
-                pressure_unit = "atm";
+                pressure_unit = _("atm");
                 break;
 
             case WeatherPressureUnits.AT:
                 pressure = (pressure * 0.00101971621298).toFixed(this._decimal_places);
-                pressure_unit = "at";
+                pressure_unit = _("at");
                 break;
 
             case WeatherPressureUnits.TORR:
                 pressure = (pressure * 0.750061683).toFixed(this._decimal_places);
-                pressure_unit = "Torr";
+                pressure_unit = _("Torr");
                 break;
 
             case WeatherPressureUnits.PSI:
                 pressure = (pressure * 0.0145037738).toFixed(this._decimal_places);
-                pressure_unit = "psi";
+                pressure_unit = _("psi");
                 break;
 
             case WeatherPressureUnits.MMHG:
                 pressure = (pressure * 0.750061683).toFixed(this._decimal_places);
-                pressure_unit = "mmHg";
+                pressure_unit = _("mmHg");
                 break;
         }
         return parseFloat(pressure).toLocaleString() + ' ' + pressure_unit;
@@ -1184,16 +1320,16 @@ const OpenweatherMenuButton = new Lang.Class({
     },
 
     formatWind: function(speed, direction) {
-        let unit = 'm/s';
+        let unit = _('m/s');
         switch (this._wind_speed_units) {
             case WeatherWindSpeedUnits.MPH:
                 speed = (speed * OPENWEATHER_CONV_MPS_IN_MPH).toFixed(this._decimal_places);
-                unit = 'mph';
+                unit = _('mph');
                 break;
 
             case WeatherWindSpeedUnits.KPH:
                 speed = (speed * OPENWEATHER_CONV_MPS_IN_KPH).toFixed(this._decimal_places);
-                unit = 'km/h';
+                unit = _('km/h');
                 break;
 
             case WeatherWindSpeedUnits.MPS:
@@ -1202,12 +1338,12 @@ const OpenweatherMenuButton = new Lang.Class({
 
             case WeatherWindSpeedUnits.KNOTS:
                 speed = (speed * OPENWEATHER_CONV_MPS_IN_KNOTS).toFixed(this._decimal_places);
-                unit = 'kn';
+                unit = _('kn');
                 break;
 
             case WeatherWindSpeedUnits.FPS:
                 speed = (speed * OPENWEATHER_CONV_MPS_IN_FPS).toFixed(this._decimal_places);
-                unit = 'ft/s';
+                unit = _('ft/s');
                 break;
 
             case WeatherWindSpeedUnits.BEAUFORT:
@@ -1353,7 +1489,7 @@ const OpenweatherMenuButton = new Lang.Class({
         });
         let rb_captions = new St.BoxLayout({
             vertical: true,
-            style_class: 'popup-status-menu-item openweather-current-databox-captions'
+            style_class: 'popup-menu-item popup-status-menu-item openweather-current-databox-captions'
         });
         let rb_values = new St.BoxLayout({
             vertical: true,
@@ -1446,7 +1582,7 @@ const OpenweatherMenuButton = new Lang.Class({
                 style_class: 'system-menu-action openweather-forecast-icon'
             });
             forecastWeather.Day = new St.Label({
-                style_class: 'popup-status-menu-item openweather-forecast-day'
+                style_class: 'popup-menu-item popup-status-menu-item openweather-forecast-day'
             });
             forecastWeather.Summary = new St.Label({
                 style_class: 'system-menu-action  openweather-forecast-summary'
