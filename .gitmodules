@@ -1,12 +1,12 @@
 [submodule "disable-workspace-switcher-popup"]
 	path = disable-workspace-switcher-popup
-	url = git://github.com/windsorschmidt/disable-workspace-switcher-popup
+	url = https://github.com/windsorschmidt/disable-workspace-switcher-popup.git
 [submodule "steal-my-focus"]
 	path = steal-my-focus
-	url = git://github.com/sstent/gnome-shell-extension-stealmyfocus
+	url = https://github.com/sstent/gnome-shell-extension-stealmyfocus.git
 [submodule "system-monitor"]
 	path = system-monitor
-	url = git://github.com/paradoxxxzero/gnome-shell-system-monitor-applet
+	url = https://github.com/yangle/gnome-shell-system-monitor-applet.git
 [submodule "impatience"]
 	path = impatience
-	url = git://github.com/gfxmonk/gnome-shell-impatience
+	url = https://github.com/gfxmonk/gnome-shell-impatience.git
