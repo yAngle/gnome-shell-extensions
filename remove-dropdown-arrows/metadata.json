@@ -9,9 +9,10 @@
     "3.14", 
     "3.16", 
     "3.18", 
-    "3.20"
+    "3.20", 
+    "3.22"
   ], 
   "url": "http://github.com/mpdeimos/gnome-shell-remove-dropdown-arrows", 
   "uuid": "remove-dropdown-arrows@mpdeimos.com", 
-  "version": 7
+  "version": 8
 }
